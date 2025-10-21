@@ -412,7 +412,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <Toaster position="top-center" />
 
       {/* Ticker Carousel */}
@@ -420,21 +420,13 @@ export default function Home() {
 
       {/* Main Content */}
       <div className="container mx-auto px-4 py-12">
-        {/* Hero Section */}
+        {/* Search Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-12 space-y-4"
+          className="mb-12"
         >
-          <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">
-            Stock Explorer
-          </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            Track, compare, and explore stocks with a beautiful, interactive interface. Drag to reorder, click to expand.
-          </p>
-          <div className="pt-4">
-            <StockSearch onAddStock={addStock} />
-          </div>
+          <StockSearch onAddStock={addStock} />
         </motion.div>
 
         {/* Stock Grid */}
@@ -461,25 +453,7 @@ export default function Home() {
               </motion.div>
             </SortableContext>
           </DndContext>
-        ) : !loading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-20"
-          >
-            <Card className="max-w-md mx-auto">
-              <CardHeader>
-                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Search className="w-8 h-8 text-primary" />
-                </div>
-                <CardTitle>Start Exploring</CardTitle>
-                <CardDescription>
-                  Search for a stock ticker to add it to your watchlist and start tracking
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          </motion.div>
-        )}
+        ) : null}
       </div>
 
       {/* Expanded Stock Dialog */}
