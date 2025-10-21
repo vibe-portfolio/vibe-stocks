@@ -165,24 +165,25 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="w-full max-w-3xl mx-auto relative">
       <div className="relative">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
         <Input
           placeholder={placeholders[placeholderIndex]}
-          className="pl-12 h-14 text-lg rounded-2xl shadow-lg border-2 focus-visible:shadow-xl transition-all"
+          className="pl-12 h-14 text-lg rounded-2xl shadow-lg border-2 focus-visible:shadow-xl transition-shadow"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 200)}
         />
         {query && (
           <Button
             variant="ghost"
             size="sm"
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 z-10"
             onClick={() => {
               setQuery('');
               setOpen(false);
@@ -196,13 +197,14 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
       <AnimatePresence>
         {open && filteredStocks.length > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="absolute top-full mt-3 w-full z-50 left-0"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
+            className="absolute top-full mt-2 w-full z-50"
           >
             <Card className="shadow-2xl border-2">
-              <CardContent className="p-2 max-h-96 overflow-y-auto">
+              <CardContent className="p-2 max-h-[400px] overflow-y-auto">
                 <Command>
                   <CommandList>
                     <CommandEmpty>No stocks found.</CommandEmpty>
