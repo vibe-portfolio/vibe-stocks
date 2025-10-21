@@ -41,20 +41,22 @@ function TickerCarousel() {
     { loop: true, dragFree: true },
     [AutoScroll({ playOnInit: true, speed: 0.8 })]
   );
-  const [tickerData, setTickerData] = useState<Record<string, { price: number; change: number }>>({});
+  const [tickerData, setTickerData] = useState<Record<string, { price: number; change: number; changePercent: number }>>({});
 
   useEffect(() => {
     const fetchPrices = async () => {
-      const prices: Record<string, { price: number; change: number }> = {};
+      const prices: Record<string, { price: number; change: number; changePercent: number }> = {};
       for (const stock of POPULAR_STOCKS) {
         try {
           const res = await fetch(`/api/stock?ticker=${stock.ticker}&period=1d`);
           if (res.ok) {
             const data = await res.json();
             const change = data.regularMarketPrice - data.chartPreviousClose;
+            const changePercent = (change / data.chartPreviousClose) * 100;
             prices[stock.ticker] = {
               price: data.regularMarketPrice,
               change: change,
+              changePercent: changePercent,
             };
           }
         } catch (e) {
@@ -64,35 +66,66 @@ function TickerCarousel() {
       setTickerData(prices);
     };
     fetchPrices();
-    const interval = setInterval(fetchPrices, 30000); // Refresh every 30s
+    const interval = setInterval(fetchPrices, 60000); // Refresh every 60s
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="border-b bg-gradient-to-r from-emerald-500/5 via-transparent to-emerald-500/5">
+    <div className="border-b overflow-hidden bg-muted/30">
       <div className="embla py-3" ref={emblaRef}>
-        <div className="embla__container flex gap-6">
+        <div className="embla__container flex gap-3">
           {POPULAR_STOCKS.map((stock) => {
             const data = tickerData[stock.ticker];
             const isPositive = data ? data.change >= 0 : true;
+            
+            // Get logo URL - use a more reliable service
+            const getLogoUrl = (ticker: string) => {
+              const logoMap: Record<string, string> = {
+                'AAPL': 'https://logo.clearbit.com/apple.com',
+                'MSFT': 'https://logo.clearbit.com/microsoft.com',
+                'GOOGL': 'https://logo.clearbit.com/google.com',
+                'AMZN': 'https://logo.clearbit.com/amazon.com',
+                'TSLA': 'https://logo.clearbit.com/tesla.com',
+                'NVDA': 'https://logo.clearbit.com/nvidia.com',
+                'META': 'https://logo.clearbit.com/meta.com',
+                'NFLX': 'https://logo.clearbit.com/netflix.com',
+                'AMD': 'https://logo.clearbit.com/amd.com',
+                'COIN': 'https://logo.clearbit.com/coinbase.com',
+                'PLTR': 'https://logo.clearbit.com/palantir.com',
+                'SPY': 'https://logo.clearbit.com/spglobal.com',
+              };
+              return logoMap[ticker] || `https://logo.clearbit.com/${ticker.toLowerCase()}.com`;
+            };
+
             return (
               <motion.div
                 key={stock.ticker}
-                className="embla__slide flex-[0_0_auto] flex items-center gap-2 px-3"
-                whileHover={{ scale: 1.05 }}
+                className="embla__slide flex-[0_0_auto]"
+                whileHover={{ scale: 1.02 }}
               >
-                <Badge variant="outline" className="font-mono font-bold">
-                  {stock.ticker}
-                </Badge>
-                {data && (
-                  <>
-                    <span className="font-semibold">${data.price.toFixed(2)}</span>
-                    <Badge variant={isPositive ? 'default' : 'destructive'} className="gap-1">
-                      {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      {isPositive ? '+' : ''}{data.change.toFixed(2)}
-                    </Badge>
-                  </>
-                )}
+                <div className="flex items-center gap-2 px-3 py-2 bg-background rounded-full border shadow-sm">
+                  <img
+                    src={getLogoUrl(stock.ticker)}
+                    alt={stock.ticker}
+                    className="w-5 h-5 rounded-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.src = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20'><rect width='20' height='20' fill='%23666'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='10' font-weight='bold'>${stock.ticker[0]}</text></svg>`;
+                    }}
+                  />
+                  <span className="font-mono font-bold text-sm">{stock.ticker}</span>
+                  {data && (
+                    <>
+                      <span className="font-semibold text-sm">${data.price.toFixed(2)}</span>
+                      <span className={cn(
+                        "text-xs font-semibold flex items-center gap-0.5",
+                        isPositive ? "text-emerald-500" : "text-red-500"
+                      )}>
+                        {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        {isPositive ? '+' : ''}{data.changePercent.toFixed(2)}%
+                      </span>
+                    </>
+                  )}
+                </div>
               </motion.div>
             );
           })}
@@ -106,6 +139,16 @@ function TickerCarousel() {
 function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  
+  const placeholders = ['AAPL', 'TSLA', 'NVDA', 'GOOGL', 'MSFT', 'META', 'AMZN', 'COIN', 'PLTR', 'AMD'];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
+    }, 1500);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredStocks = query
     ? SEARCHABLE_STOCKS.filter(
@@ -113,7 +156,7 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
           stock.ticker.toLowerCase().includes(query.toLowerCase()) ||
           stock.name.toLowerCase().includes(query.toLowerCase())
       ).slice(0, 10)
-    : POPULAR_STOCKS.slice(0, 6);
+    : POPULAR_STOCKS.slice(0, 8);
 
   const handleSelect = (ticker: string) => {
     onAddStock(ticker);
@@ -122,12 +165,12 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
   };
 
   return (
-    <div className="w-full max-w-2xl mx-auto">
+    <div className="w-full max-w-3xl mx-auto">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
         <Input
-          placeholder="Search stocks... (e.g., AAPL, Tesla)"
-          className="pl-10 h-12 text-base"
+          placeholder={placeholders[placeholderIndex]}
+          className="pl-12 h-14 text-lg rounded-2xl shadow-lg border-2 focus-visible:shadow-xl transition-all"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -156,32 +199,56 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="absolute top-full mt-2 w-full max-w-2xl z-50"
+            className="absolute top-full mt-3 w-full z-50 left-0"
           >
-            <Card>
-              <CardContent className="p-2">
+            <Card className="shadow-2xl border-2">
+              <CardContent className="p-2 max-h-96 overflow-y-auto">
                 <Command>
                   <CommandList>
                     <CommandEmpty>No stocks found.</CommandEmpty>
                     <CommandGroup heading={query ? 'Search Results' : 'Popular Stocks'}>
-                      {filteredStocks.map((stock) => (
-                        <CommandItem
-                          key={stock.ticker}
-                          onSelect={() => handleSelect(stock.ticker)}
-                          className="flex items-center justify-between cursor-pointer"
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                              <span className="font-bold text-sm text-primary">{stock.ticker.slice(0, 2)}</span>
+                      {filteredStocks.map((stock) => {
+                        const logoMap: Record<string, string> = {
+                          'AAPL': 'https://logo.clearbit.com/apple.com',
+                          'MSFT': 'https://logo.clearbit.com/microsoft.com',
+                          'GOOGL': 'https://logo.clearbit.com/google.com',
+                          'AMZN': 'https://logo.clearbit.com/amazon.com',
+                          'TSLA': 'https://logo.clearbit.com/tesla.com',
+                          'NVDA': 'https://logo.clearbit.com/nvidia.com',
+                          'META': 'https://logo.clearbit.com/meta.com',
+                          'NFLX': 'https://logo.clearbit.com/netflix.com',
+                          'AMD': 'https://logo.clearbit.com/amd.com',
+                          'COIN': 'https://logo.clearbit.com/coinbase.com',
+                          'PLTR': 'https://logo.clearbit.com/palantir.com',
+                          'SPY': 'https://logo.clearbit.com/spglobal.com',
+                        };
+                        
+                        return (
+                          <CommandItem
+                            key={stock.ticker}
+                            onSelect={() => handleSelect(stock.ticker)}
+                            className="flex items-center justify-between cursor-pointer py-3"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
+                                <img
+                                  src={logoMap[stock.ticker] || `https://logo.clearbit.com/${stock.ticker.toLowerCase()}.com`}
+                                  alt={stock.ticker}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23666'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold'>${stock.ticker.slice(0, 2)}</text></svg>`;
+                                  }}
+                                />
+                              </div>
+                              <div>
+                                <div className="font-semibold">{stock.ticker}</div>
+                                <div className="text-sm text-muted-foreground truncate max-w-xs">{stock.name}</div>
+                              </div>
                             </div>
-                            <div>
-                              <div className="font-semibold">{stock.ticker}</div>
-                              <div className="text-sm text-muted-foreground">{stock.name}</div>
-                            </div>
-                          </div>
-                          <Plus className="w-4 h-4 text-muted-foreground" />
-                        </CommandItem>
-                      ))}
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                          </CommandItem>
+                        );
+                      })}
                     </CommandGroup>
                   </CommandList>
                 </Command>
@@ -419,12 +486,12 @@ export default function Home() {
       <TickerCarousel />
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-12">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Search Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mb-12"
+          className="mb-8"
         >
           <StockSearch onAddStock={addStock} />
         </motion.div>
