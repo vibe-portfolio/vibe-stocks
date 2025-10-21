@@ -276,6 +276,24 @@ function StockCard({ stock, onRemove, onExpand }: { stock: StockData; onRemove: 
   const priceChangePercent = ((priceChange / stock.chartPreviousClose) * 100).toFixed(2);
   const isPositive = priceChange >= 0;
 
+  const getLogoUrl = (ticker: string) => {
+    const logoMap: Record<string, string> = {
+      'AAPL': 'https://logo.clearbit.com/apple.com',
+      'MSFT': 'https://logo.clearbit.com/microsoft.com',
+      'GOOGL': 'https://logo.clearbit.com/google.com',
+      'AMZN': 'https://logo.clearbit.com/amazon.com',
+      'TSLA': 'https://logo.clearbit.com/tesla.com',
+      'NVDA': 'https://logo.clearbit.com/nvidia.com',
+      'META': 'https://logo.clearbit.com/meta.com',
+      'NFLX': 'https://logo.clearbit.com/netflix.com',
+      'AMD': 'https://logo.clearbit.com/amd.com',
+      'COIN': 'https://logo.clearbit.com/coinbase.com',
+      'PLTR': 'https://logo.clearbit.com/palantir.com',
+      'SPY': 'https://logo.clearbit.com/spglobal.com',
+    };
+    return logoMap[ticker] || `https://logo.clearbit.com/${ticker.toLowerCase()}.com`;
+  };
+
   return (
     <motion.div
       ref={setNodeRef}
@@ -284,27 +302,27 @@ function StockCard({ stock, onRemove, onExpand }: { stock: StockData; onRemove: 
       initial={{ scale: 0, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       exit={{ scale: 0, opacity: 0 }}
-      whileHover={{ scale: 1.02, y: -4 }}
-      className={cn(isDragging && 'opacity-50 scale-105 rotate-2')}
+      whileHover={{ scale: 1.03, y: -6 }}
+      className={cn(isDragging && 'opacity-50')}
     >
-      <Card className="group cursor-pointer overflow-hidden border-2 hover:border-primary/50 transition-all">
+      <Card className="group cursor-pointer overflow-hidden border-2 hover:border-primary hover:shadow-2xl hover:shadow-primary/20 transition-all relative">
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <CardTitle className="text-2xl">{stock.ticker}</CardTitle>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Sparkles className="w-4 h-4 text-primary" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Live data</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+              <div className="flex items-center gap-3 mb-2">
+                <img
+                  src={getLogoUrl(stock.ticker)}
+                  alt={stock.ticker}
+                  className="w-10 h-10 rounded-lg object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><rect width='40' height='40' fill='%23666'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='16' font-weight='bold'>${stock.ticker[0]}</text></svg>`;
+                  }}
+                />
+                <div>
+                  <CardTitle className="text-2xl">{stock.ticker}</CardTitle>
+                  <CardDescription className="text-xs">{stock.name}</CardDescription>
+                </div>
               </div>
-              <CardDescription className="text-xs truncate">{stock.name}</CardDescription>
             </div>
             <div className="flex gap-1">
               <TooltipProvider>
@@ -442,14 +460,6 @@ export default function Home() {
       };
 
       setStocks((prev) => [...prev, newStock]);
-      toast.success(`Added ${ticker} to watchlist`, {
-        icon: '📈',
-        style: {
-          borderRadius: '10px',
-          background: '#333',
-          color: '#fff',
-        },
-      });
     } catch (error) {
       toast.error(`Failed to add ${ticker}`);
     } finally {
@@ -459,14 +469,6 @@ export default function Home() {
 
   const removeStock = useCallback((id: string) => {
     setStocks((prev) => prev.filter((s) => s.id !== id));
-    toast.success('Removed from watchlist', {
-      icon: '🗑️',
-      style: {
-        borderRadius: '10px',
-        background: '#333',
-        color: '#fff',
-      },
-    });
   }, []);
 
   const handleDragEnd = (event: DragEndEvent) => {
