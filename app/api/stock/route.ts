@@ -36,6 +36,8 @@ export async function GET(request: NextRequest) {
       timestamps: result.timestamp,
       prices: result.indicators.quote[0].close,
       volumes: result.indicators.quote[0].volume,
+      volume: result.meta.regularMarketVolume || 0,
+      marketCap: result.meta.marketCap || 0,
     });
   } catch (error) {
     console.error('Error fetching stock data:', error);

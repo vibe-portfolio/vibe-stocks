@@ -33,6 +33,9 @@ type StockData = {
   chartPreviousClose: number;
   timestamps: number[];
   prices: number[];
+  volume?: number;
+  marketCap?: number;
+  lastUpdated?: number;
 };
 
 // Ticker Carousel Component
@@ -70,8 +73,27 @@ function TickerCarousel() {
     return () => clearInterval(interval);
   }, []);
 
+  const isMarketOpen = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const time = hours * 60 + minutes;
+    const marketOpen = 9 * 60 + 30;
+    const marketClose = 16 * 60;
+    return day >= 1 && day <= 5 && time >= marketOpen && time < marketClose;
+  };
+
   return (
     <div className="border-b overflow-hidden bg-muted/30">
+      <div className="flex items-center justify-between px-4 py-2 border-b bg-background/50">
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${isMarketOpen() ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+          <span className="text-xs font-semibold">
+            {isMarketOpen() ? 'Market Open' : 'Market Closed'}
+          </span>
+        </div>
+      </div>
       <div className="embla py-3" ref={emblaRef}>
         <div className="embla__container flex gap-3">
           {POPULAR_STOCKS.map((stock) => {
@@ -185,13 +207,25 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
     setQuery('');
   };
 
+  // Keyboard shortcut for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        document.querySelector('input')?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="w-full max-w-3xl mx-auto relative">
       <div className="relative">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
         <Input
           placeholder={placeholders[placeholderIndex]}
-          className="pl-12 h-14 text-lg rounded-2xl shadow-lg border-2 focus-visible:shadow-xl transition-shadow"
+          className="pl-12 pr-20 h-14 text-lg rounded-2xl shadow-lg border-2 focus-visible:shadow-xl transition-shadow"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -200,6 +234,9 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
         />
+        <kbd className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none hidden sm:inline-block px-2 py-1 text-xs font-semibold text-muted-foreground bg-muted rounded border">
+          ⌘K
+        </kbd>
         {query && (
           <Button
             variant="ghost"
@@ -383,11 +420,37 @@ function StockCard({ stock, onRemove, onExpand }: { stock: StockData; onRemove: 
             <div className="text-3xl font-bold mb-1">
               ${stock.regularMarketPrice.toFixed(2)}
             </div>
-            <Badge variant={isPositive ? 'default' : 'destructive'} className="gap-1">
-              {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-              {isPositive ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent}%)
-            </Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant={isPositive ? 'default' : 'destructive'} className="gap-1">
+                {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                {isPositive ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent}%)
+              </Badge>
+              {stock.lastUpdated && (
+                <span className="text-xs text-muted-foreground">
+                  Updated {Math.floor((Date.now() - stock.lastUpdated) / 1000)}s ago
+                </span>
+              )}
+            </div>
           </div>
+
+          <Separator />
+
+          {(stock.volume || stock.marketCap) && (
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {stock.volume && (
+                <div>
+                  <div className="text-muted-foreground text-xs">Volume</div>
+                  <div className="font-semibold">{(stock.volume / 1000000).toFixed(2)}M</div>
+                </div>
+              )}
+              {stock.marketCap && (
+                <div>
+                  <div className="text-muted-foreground text-xs">Market Cap</div>
+                  <div className="font-semibold">${(stock.marketCap / 1000000000).toFixed(2)}B</div>
+                </div>
+              )}
+            </div>
+          )}
 
           <Separator />
 
@@ -451,11 +514,58 @@ export default function Home() {
   const [stocks, setStocks] = useState<StockData[]>([]);
   const [expandedStock, setExpandedStock] = useState<StockData | null>(null);
   const [loading, setLoading] = useState<string | null>(null);
+  const [compareMode, setCompareMode] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // Auto-refresh prices every 60 seconds
+  useEffect(() => {
+    if (stocks.length === 0) return;
+
+    const refreshPrices = async () => {
+      const updatedStocks = await Promise.all(
+        stocks.map(async (stock) => {
+          try {
+            const res = await fetch(`/api/stock?ticker=${stock.ticker}&period=1d`);
+            if (res.ok) {
+              const data = await res.json();
+              return {
+                ...stock,
+                regularMarketPrice: data.regularMarketPrice,
+                chartPreviousClose: data.chartPreviousClose,
+                lastUpdated: Date.now(),
+              };
+            }
+          } catch (e) {
+            console.error(`Failed to refresh ${stock.ticker}`);
+          }
+          return stock;
+        })
+      );
+      setStocks(updatedStocks);
+    };
+
+    const interval = setInterval(refreshPrices, 60000);
+    return () => clearInterval(interval);
+  }, [stocks]);
+
+  // Check if market is open
+  const isMarketOpen = () => {
+    const now = new Date();
+    const day = now.getDay();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const time = hours * 60 + minutes;
+    
+    // Market hours: Mon-Fri 9:30 AM - 4:00 PM ET
+    const marketOpen = 9 * 60 + 30; // 9:30 AM
+    const marketClose = 16 * 60; // 4:00 PM
+    
+    return day >= 1 && day <= 5 && time >= marketOpen && time < marketClose;
+  };
 
   const addStock = useCallback(async (ticker: string) => {
     if (stocks.some((s) => s.ticker === ticker)) {
@@ -492,6 +602,9 @@ export default function Home() {
         chartPreviousClose: data.chartPreviousClose,
         timestamps: data.timestamps,
         prices: data.prices,
+        volume: data.volume,
+        marketCap: data.marketCap,
+        lastUpdated: Date.now(),
       };
 
       setStocks((prev) => [...prev, newStock]);
