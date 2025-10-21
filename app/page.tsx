@@ -1,103 +1,186 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { Loader2 } from 'lucide-react';
+
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+
+type StockData = {
+  ticker: string;
+  currency: string;
+  regularMarketPrice: number;
+  chartPreviousClose: number;
+  timestamps: number[];
+  prices: number[];
+};
+
+const PERIODS = [
+  { label: '1D', value: '1d' },
+  { label: '5D', value: '5d' },
+  { label: '1M', value: '1mo' },
+  { label: '6M', value: '6mo' },
+  { label: '1Y', value: '1y' },
+  { label: '5Y', value: '5y' },
+  { label: 'MAX', value: 'max' },
+];
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [ticker, setTicker] = useState('');
+  const [period, setPeriod] = useState('1y');
+  const [loading, setLoading] = useState(false);
+  const [stockData, setStockData] = useState<StockData | null>(null);
+  const [error, setError] = useState('');
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+  const fetchStockData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ticker) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/stock?ticker=${ticker.toUpperCase()}&period=${period}`);
+      if (!response.ok) throw new Error('Failed to fetch');
+      
+      const data = await response.json();
+      setStockData(data);
+    } catch (err) {
+      setError('Failed to fetch stock data. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const priceChange = stockData
+    ? stockData.regularMarketPrice - stockData.chartPreviousClose
+    : 0;
+  const priceChangePercent = stockData
+    ? ((priceChange / stockData.chartPreviousClose) * 100).toFixed(2)
+    : '0.00';
+
+  return (
+    <div className="min-h-screen bg-[#0a0a0a] text-white p-4 sm:p-8">
+      <div className="max-w-5xl mx-auto">
+        {/* Search Bar */}
+        <form onSubmit={fetchStockData} className="mb-8 flex flex-col sm:flex-row gap-2">
+          <input
+            type="text"
+            value={ticker}
+            onChange={(e) => setTicker(e.target.value)}
+            placeholder="Enter Ticker (e.g., AAPL, MSFT)"
+            className="flex-1 bg-[#2d2e30] text-white placeholder-neutral-400 border border-neutral-600 rounded-lg p-3 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 rounded-lg transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Get Data
+          </button>
+        </form>
+
+        {error && (
+          <div className="mb-4 p-4 bg-red-500/10 border border-red-500/50 rounded-lg text-red-400">
+            {error}
+          </div>
+        )}
+
+        {stockData && (
+          <div className="bg-[#1a1a1a] rounded-xl p-6 border border-neutral-800">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-bold mb-2">{stockData.ticker}</h1>
+                <p className="text-sm text-neutral-400">Currency: {stockData.currency}</p>
+              </div>
+              <div className="text-right">
+                <div className="flex items-baseline gap-2">
+                  <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+                  <span className="text-3xl sm:text-4xl font-bold">
+                    {stockData.regularMarketPrice.toFixed(2)}
+                  </span>
+                  <span className="text-neutral-400 text-lg">{stockData.currency}</span>
+                </div>
+                <div className={`text-sm mt-1 ${priceChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {priceChange >= 0 ? '+' : ''}{priceChange.toFixed(2)} ({priceChangePercent}%)
+                </div>
+              </div>
+            </div>
+
+            {/* Period Selector */}
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => {
+                    setPeriod(p.value);
+                    if (ticker) {
+                      fetchStockData(new Event('submit') as any);
+                    }
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    period === p.value
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-[#2d2e30] text-neutral-300 hover:bg-[#3d3e40]'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart */}
+            <div className="w-full h-[400px] sm:h-[500px]">
+              <Plot
+                data={[
+                  {
+                    x: stockData.timestamps.map((t) => new Date(t * 1000)),
+                    y: stockData.prices,
+                    type: 'scatter',
+                    mode: 'lines',
+                    fill: 'tozeroy',
+                    fillcolor: 'rgba(16, 185, 129, 0.1)',
+                    line: { color: '#10b981', width: 2 },
+                    hovertemplate: '<b>%{y:.2f}</b><br>%{x}<extra></extra>',
+                  },
+                ]}
+                layout={{
+                  autosize: true,
+                  paper_bgcolor: '#1a1a1a',
+                  plot_bgcolor: '#1a1a1a',
+                  font: { color: '#d4d4d4', family: 'Inter, sans-serif' },
+                  xaxis: {
+                    gridcolor: '#2d2e30',
+                    showgrid: true,
+                    zeroline: false,
+                  },
+                  yaxis: {
+                    gridcolor: '#2d2e30',
+                    showgrid: true,
+                    zeroline: false,
+                  },
+                  margin: { l: 50, r: 20, t: 20, b: 40 },
+                  hovermode: 'x unified',
+                }}
+                config={{
+                  displayModeBar: false,
+                  responsive: true,
+                }}
+                style={{ width: '100%', height: '100%' }}
+              />
+            </div>
+          </div>
+        )}
+
+        {!stockData && !loading && (
+          <div className="text-center text-neutral-500 mt-20">
+            <p className="text-lg">Enter a stock ticker to get started</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
