@@ -140,6 +140,8 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
   
   const placeholders = ['AAPL', 'TSLA', 'NVDA', 'GOOGL', 'MSFT', 'META', 'AMZN', 'COIN', 'PLTR', 'AMD'];
 
@@ -150,13 +152,32 @@ function StockSearch({ onAddStock }: { onAddStock: (ticker: string) => void }) {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredStocks = query
-    ? SEARCHABLE_STOCKS.filter(
-        (stock) =>
-          stock.ticker.toLowerCase().includes(query.toLowerCase()) ||
-          stock.name.toLowerCase().includes(query.toLowerCase())
-      ).slice(0, 10)
-    : POPULAR_STOCKS.slice(0, 8);
+  useEffect(() => {
+    const searchStocks = async () => {
+      if (!query || query.length < 1) {
+        setSearchResults([]);
+        return;
+      }
+
+      setSearching(true);
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        if (response.ok) {
+          const results = await response.json();
+          setSearchResults(results);
+        }
+      } catch (error) {
+        console.error('Search failed:', error);
+      } finally {
+        setSearching(false);
+      }
+    };
+
+    const debounce = setTimeout(searchStocks, 300);
+    return () => clearTimeout(debounce);
+  }, [query]);
+
+  const filteredStocks = query ? searchResults : POPULAR_STOCKS.slice(0, 8).map(s => ({ ticker: s.ticker, name: s.name }));
 
   const handleSelect = (ticker: string) => {
     onAddStock(ticker);
@@ -448,10 +469,24 @@ export default function Home() {
       if (!res.ok) throw new Error('Failed to fetch');
 
       const data = await res.json();
+      // Try to get company name from search results or use ticker
+      let companyName = ticker;
+      try {
+        const searchRes = await fetch(`/api/search?q=${ticker}`);
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          if (searchData.length > 0) {
+            companyName = searchData[0].name;
+          }
+        }
+      } catch (e) {
+        // Use ticker as fallback
+      }
+
       const newStock: StockData = {
         id: `${ticker}-${Date.now()}`,
         ticker: data.ticker,
-        name: SEARCHABLE_STOCKS.find((s) => s.ticker === ticker)?.name || ticker,
+        name: companyName,
         currency: data.currency,
         regularMarketPrice: data.regularMarketPrice,
         chartPreviousClose: data.chartPreviousClose,
