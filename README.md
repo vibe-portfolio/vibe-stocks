@@ -75,3 +75,4 @@ stock-graph-nextjs/
 ## License
 
 MIT
+
