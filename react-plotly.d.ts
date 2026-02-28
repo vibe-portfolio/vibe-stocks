@@ -18,3 +18,10 @@ declare module 'react-plotly.js' {
 
   export default class Plot extends Component<PlotProps> {}
 }
+
+declare module 'react-plotly.js/factory' {
+  import type { ComponentType } from 'react';
+  type Plotly = any;
+  function createPlotlyComponent(plotly: Plotly): ComponentType<any>;
+  export default createPlotlyComponent;
+}
